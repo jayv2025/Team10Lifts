@@ -17,6 +17,7 @@ import Team10Recipes from './screens/Team10Recipes';
 import Team10Workouts from './screens/Team10Workouts';
 import Team10Meals from './screens/Team10Meals';
 import ViewProfile from './screens/ViewProfile';
+import EditProfile from './screens/EditProfile';
 import LogOut from './screens/LogOut';
 import LogIn from './screens/LogIn';
 import SignUp from './screens/SignUp';
@@ -144,6 +145,14 @@ export default function App() {
               component={ViewProfile}
               options={{ title: 'View Profile' }}
             />
+            <Drawer.Screen
+              name="Edit Profile"
+              component={EditProfile}
+              options={{ 
+                title: 'Edit Profile',
+                drawerItemStyle: {display: 'none'} 
+              }}
+             />
 
             <Drawer.Screen
               name="Log Out"

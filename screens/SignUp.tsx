@@ -44,11 +44,13 @@ export default function SignUp({ navigation }: any) {
       }
 
       if (!data.session) {
-        setMessage('Account created! Please log in.');
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Log In' }],
-        });
+        setMessage('Check your email to confirm your account, then log in.');
+        setTimeout(() => {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Log In' }],
+          });
+        }, 3000);
         return;
       }
 
