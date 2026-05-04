@@ -6,6 +6,10 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import type { Session } from '@supabase/supabase-js';
 
 import { supabase } from './lib/supabase';
+import {
+  getDemoAdminSession,
+  subscribeDemoAdminSession,
+} from './lib/demoAuth';
 
 import HomeScreen from './screens/HomeScreen';
 import Team10Programs from './screens/Team10Programs';
@@ -21,17 +25,20 @@ const Drawer = createDrawerNavigator();
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
+  const [isDemoAdmin, setIsDemoAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (isMounted) {
-          setSession(data.session);
+    Promise.all([supabase.auth.getSession(), getDemoAdminSession()])
+      .then(([{ data }, demoAdminSession]) => {
+        if (!isMounted) {
+          return;
         }
+
+        setSession(data.session);
+        setIsDemoAdmin(demoAdminSession);
       })
       .finally(() => {
         if (isMounted) {
@@ -45,8 +52,15 @@ export default function App() {
       }
     );
 
+    const unsubscribeDemoAdmin = subscribeDemoAdminSession((demoAdminSession) => {
+      if (isMounted) {
+        setIsDemoAdmin(demoAdminSession);
+      }
+    });
+
     return () => {
       isMounted = false;
+      unsubscribeDemoAdmin();
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -66,7 +80,7 @@ export default function App() {
     );
   }
 
-  const isLoggedIn = session !== null;
+  const isLoggedIn = session !== null || isDemoAdmin;
 
   return (
     <NavigationContainer>

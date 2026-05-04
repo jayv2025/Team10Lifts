@@ -1,139 +1,165 @@
 # Team10Lifts
-**AI-Powered Fitness Tracking and Progression Platform**
 
----
+AI-powered fitness planning and workout tracking built with Expo React Native, Supabase, and AI Edge Functions.
 
-## Table of Contents
-- Overview
-- Problem
-- Solution
-- Core Features
-- System Architecture
-- How to Run
+## 1. Project Overview
 
----
+Team10Lifts is a fitness app designed to make training more organized, more beginner-friendly, and more interactive.
 
-### Overview
+The app focuses on three main goals:
 
-Team10Lifts is a fitness tracking application designed to help users log workouts, monitor progression, and recieve AI-powered training support.
+- Give users structured workouts and programs
+- Help users manage their own workout split
+- Add AI support for coaching and workout generation
 
-The platform focuses on one of the most important principles in fitness: **progression overload**. Many users stuggle to imporve because they don't consistently track their workouts or know how to adjust their training over time.
+## 2. Core Features
 
-This project combines:
-- Workout logging
-- Secure user authentication
-- Personalized exercise tracking
-- AI-generated training suggestions
-- Offline-first performance planning
-- A simple, fast mobile experience
+- Public home page with project overview and AI coach
+- Programs page with built-in workout templates
+- Recipes and meals pages
+- Private `My Workouts` page for creating, editing, favoriting, and deleting workouts
+- AI-generated workout programs
+- Supabase authentication with login, signup, and logout
 
----
+## 3. Major Codebase Sections
 
-### Problem
+### Screens
 
-Many people go to the gym consistently without seeing clear progress because they are not tracking their workouts accuractely.
+The `screens/` folder contains the app UI and user flows.
 
-Common issues include:
-- No structured workout history
-- Difficulty knowing when to increase weight or reps
-- Lack of personalized training guidance
-- Intimidation for beginners who don't know where to start
-- Friction in logging workouts during a session
+- `HomeScreen.tsx`
+  - Landing page
+  - `Ask Jake` AI coach
+- `Team10Programs.tsx`
+  - Built-in training programs
+  - Import programs into `My Workouts`
+- `Team10Workouts.tsx`
+  - Main workout management page
+  - AI workout generation
+- `Team10Recipes.tsx`
+  - Recipe browsing
+- `Team10Meals.tsx`
+  - Meal browsing
+- `LogIn.tsx`, `SignUp.tsx`, `LogOut.tsx`
+  - Authentication flow
+- `ViewProfile.tsx`
+  - Profile placeholder screen
 
-Without a system for tracking performance and progression, users can easily repeat the same workouts without improving.
+### Shared Logic
 
----
+The `lib/` folder holds shared data and helpers.
 
-### Solution
+- `supabase.ts`
+  - Creates the Supabase client
+- `demoAuth.ts`
+  - Handles demo-admin session state
+- `workoutData.ts`
+  - Shared workout storage and persistence
+- `programData.ts`
+  - Built-in workout program templates
+- `recipeData.ts`
+  - Shared recipe and meal content
 
-Team10Lifts provides a simple and intelligent system for workout tracking and progression.
+### Supabase
 
-The app is designed to help users:
-1. Create and manage an account
-2. Log workouts quickly
-3. Store workout history securely 
-4. Track personal progression over time
-5. Recieve AI-powered suggesiotns for future lifts and programming.
+The `supabase/functions/` folder contains serverless backend logic.
 
-The long-term goal is to create a fitness app that feels fast, accessible, and helpful for both beginners and experienced lifters.
+- `ask-jake`
+  - AI coach for homepage questions
+- `generate-workout-program`
+  - Creates structured workout splits from user prompts
+- `progression-suggestion`
+  - Reads workout history for progression-related logic
 
----
+## 4. App Architecture
 
-### Core Features
+The project is split into three layers:
 
-**Functional Requirements**
+### Frontend
 
-The system is designed to support the following core features:
-- User authentication and account management
-- Workout logging
-- Logbook of past activity
-- Workout program support
-- Workout program support
-- AI-based progression suggestions
+- Built with Expo, React Native, and TypeScript
+- Uses drawer navigation
+- Handles public and private screen flows
 
-**Non-Functional Requirements**
+### Backend
 
-The system also prioritizes:
-- Friendly UI with fewer than 3 taps to start or log a workout
-- Fast AI response time, with suggestions targeted to load in under 10 seconds
-- Secure storage and protection of personal workout data
-- Reliable mobile session persistence
-- Offline-first logging support for better in-gym usability
+- Uses Supabase for authentication
+- Uses Supabase Edge Functions for AI features
 
-**Example Use Cases**
-- **Fitness novice:** wants AI to generate a plan so the gym feels less intimidating
-- **Experienced lifter:** wants accurate logs to track progression over time
-- **Busy user:** wants quick suggestions on what to lift and when
+### Local Persistence
 
----
+- Uses AsyncStorage for saved workouts and demo-admin state
 
-### System Architecture
+## 5. AI Features
 
-Team10Lifts is built around a mobile frontend, a Supabase backend, and an AI suggestion layer.
+The app currently has two AI experiences:
 
-**Main Components:**
+### Ask Jake
 
-- **Mobile App Frontend**
-  - Built for quick workout interaction
-  - Uses NativeWind for styling
-  - Supports user login and workout logging
+- Found on the home screen
+- Lets the user ask fitness questions
+- Returns short coaching responses
 
-- **Supabase Backend**
-  - Handles authentication
-  - Stores user profiles
-  - Enforces Row Level Security for user data protection
+### Workout Generator
 
-- **AI Suggestion Layer**
-  - Powered through an Edge Function
-  - Uses workout history to generate progression recommendation
-  - Secures API secrets using the Supabase secret vault
+- Found on `My Workouts`
+- Lets the user type prompts like:
+  - “Build me a 3 day full body split”
+- Returns a structured program that can be imported directly into the workout list
 
-- **Current Database Tables**
-  - `profiles`
-  - `exercises`
-  - `workouts`
-  - `set_logs`
+## 6. Demo Flow
 
----
+Recommended order for the final presentation:
 
-### How to Run
+1. Start on the `Home` screen
+2. Show the homepage sections and custom program images
+3. Demo `Ask Jake`
+4. Open `Programs`
+5. Show a built-in program and import it into `My Workouts`
+6. Open `My Workouts`
+7. Edit, favorite, or delete a workout
+8. Generate a new workout plan with AI
+9. Import the generated plan
+10. Briefly show login/signup/logout and explain Supabase Auth
 
-1. Clone the project
-- `git clone <your-repo-url>`
-- `cd Team10Lifts`
+## 7. Tech Stack
 
-2. Install dependencies
-- `npm install`
+- Expo
+- React Native
+- TypeScript
+- React Navigation
+- Supabase
+- Groq via Supabase Edge Functions
+- AsyncStorage
 
-3. Add enviornment variables: Create a `.env` file and include:
-- `EXPO_PUBLIC_SUPABASE_URL=your_supabase_url`
-- `EXPO_PUBLIC-SUPABASE_PUBLISHABLE_KEY=your_publishable_key`
+## 8. Key Files
 
-4. Start the developement server
-- `npx expo start --ios`
-- `npx expo start --android`
-- `npx expo start --web`
+- `App.tsx`
+- `screens/HomeScreen.tsx`
+- `screens/Team10Programs.tsx`
+- `screens/Team10Workouts.tsx`
+- `lib/workoutData.ts`
+- `lib/programData.ts`
+- `lib/recipeData.ts`
+- `supabase/functions/ask-jake/index.ts`
+- `supabase/functions/generate-workout-program/index.ts`
 
-5. Run Supabase functions locally (optional): If needed for backend development:
-- `supabase start`
-- `supabase functions serve`
+## 9. How to Run
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the web demo:
+
+```bash
+npm run web
+```
+
+Optional type check:
+
+```bash
+npx tsc --noEmit
+```

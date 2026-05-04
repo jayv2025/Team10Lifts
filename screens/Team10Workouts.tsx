@@ -1,182 +1,237 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  ScrollView,
   View,
-  TouchableOpacity,
-  StyleSheet,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
-type FilterType = 'All' | 'Favorites' | Difficulty;
+import { supabase } from '../lib/supabase';
+import {
+  appendWorkouts,
+  defaultWorkouts,
+  loadWorkouts,
+  saveWorkouts,
+  type Difficulty,
+  type FilterType,
+  type WorkoutDay,
+} from '../lib/workoutData';
 
-type WorkoutDay = {
-  id: string;
+type Workout = WorkoutDay;
+
+type GeneratedWorkout = {
   day: string;
   focus: string;
   exercises: string[];
   difficulty: Difficulty;
-  favorite: boolean;
   estimatedTime: string;
 };
 
-export default function Team10Workouts() {
-  const [workouts, setWorkouts] = useState<WorkoutDay[]>([
-    {
-      id: '1',
-      day: 'Monday',
-      focus: 'Upper Body',
-      exercises: [
-        'Bench Press - 3x8',
-        'Shoulder Press - 3x10',
-        'Tricep Pushdowns - 3x12',
-      ],
-      difficulty: 'Beginner',
-      favorite: true,
-      estimatedTime: '35 min',
-    },
-    {
-      id: '2',
-      day: 'Tuesday',
-      focus: 'Lower Body',
-      exercises: [
-        'Squats - 3x8',
-        'Romanian Deadlifts - 3x10',
-        'Calf Raises - 3x12',
-      ],
-      difficulty: 'Intermediate',
-      favorite: false,
-      estimatedTime: '45 min',
-    },
-    {
-      id: '3',
-      day: 'Wednesday',
-      focus: 'Rest / Recovery',
-      exercises: ['Light walk', 'Stretching', 'Mobility work'],
-      difficulty: 'Beginner',
-      favorite: false,
-      estimatedTime: '20 min',
-    },
-  ]);
+type GeneratedProgram = {
+  title: string;
+  summary: string;
+  workouts: GeneratedWorkout[];
+};
 
+const CHAT_PLACEHOLDER =
+  'Build me a program for a 3 day a week full body split';
+
+export default function Team10Workouts() {
+  const [workouts, setWorkouts] = useState<Workout[]>(defaultWorkouts);
   const [day, setDay] = useState('');
   const [focus, setFocus] = useState('');
-  const [exercisesInput, setExercisesInput] = useState('');
+  const [exerciseText, setExerciseText] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
   const [estimatedTime, setEstimatedTime] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('All');
+  const [filter, setFilter] = useState<FilterType>('All');
+  const [chatPrompt, setChatPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedProgram, setGeneratedProgram] =
+    useState<GeneratedProgram | null>(null);
+  const [hasLoadedWorkouts, setHasLoadedWorkouts] = useState(false);
 
-  const filters: FilterType[] = [
-    'All',
-    'Favorites',
-    'Beginner',
-    'Intermediate',
-    'Advanced',
-  ];
+  useFocusEffect(
+    React.useCallback(() => {
+      let isActive = true;
+
+      loadWorkouts().then((storedWorkouts) => {
+        if (isActive) {
+          setWorkouts(storedWorkouts);
+          setHasLoadedWorkouts(true);
+        }
+      });
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    if (!hasLoadedWorkouts) {
+      return;
+    }
+
+    saveWorkouts(workouts);
+  }, [hasLoadedWorkouts, workouts]);
 
   const filteredWorkouts = workouts.filter((workout) => {
-    if (activeFilter === 'All') return true;
-    if (activeFilter === 'Favorites') return workout.favorite;
-    return workout.difficulty === activeFilter;
+    if (filter === 'All') {
+      return true;
+    }
+
+    if (filter === 'Favorites') {
+      return workout.favorite;
+    }
+
+    return workout.difficulty === filter;
   });
 
-  function clearForm() {
+  function resetForm() {
     setDay('');
     setFocus('');
-    setExercisesInput('');
+    setExerciseText('');
     setDifficulty('Beginner');
     setEstimatedTime('');
     setEditingId(null);
   }
 
-  function handleSaveWorkout() {
+  function editWorkout(workout: Workout) {
+    setEditingId(workout.id);
+    setDay(workout.day);
+    setFocus(workout.focus);
+    setExerciseText(workout.exercises.join('\n'));
+    setDifficulty(workout.difficulty);
+    setEstimatedTime(workout.estimatedTime);
+    setMessage('Editing selected workout.');
+  }
+
+  function saveWorkout() {
     setMessage('');
 
-    if (!day.trim() || !focus.trim() || !exercisesInput.trim()) {
+    if (!day.trim() || !focus.trim() || !exerciseText.trim()) {
       setMessage('Please enter a day, focus, and at least one exercise.');
       return;
     }
 
-    const exerciseList = exercisesInput
+    const exercises = exerciseText
       .split('\n')
-      .map((exercise) => exercise.trim())
-      .filter((exercise) => exercise.length > 0);
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
 
     if (editingId) {
-      setWorkouts((currentWorkouts) =>
-        currentWorkouts.map((workout) =>
+      setWorkouts((current) =>
+        current.map((workout) =>
           workout.id === editingId
             ? {
                 ...workout,
                 day: day.trim(),
                 focus: focus.trim(),
-                exercises: exerciseList,
+                exercises,
                 difficulty,
                 estimatedTime: estimatedTime.trim() || '30 min',
               }
             : workout
         )
       );
-
       setMessage('Workout updated successfully.');
     } else {
-      const newWorkout: WorkoutDay = {
-        id: Date.now().toString(),
+      const nextWorkout: Workout = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         day: day.trim(),
         focus: focus.trim(),
-        exercises: exerciseList,
+        exercises,
         difficulty,
         favorite: false,
         estimatedTime: estimatedTime.trim() || '30 min',
       };
 
-      setWorkouts((currentWorkouts) => [...currentWorkouts, newWorkout]);
+      setWorkouts((current) => [...current, nextWorkout]);
       setMessage('Workout added to your weekly split.');
     }
 
-    clearForm();
+    resetForm();
   }
 
-  function handleEditWorkout(workout: WorkoutDay) {
-    setEditingId(workout.id);
-    setDay(workout.day);
-    setFocus(workout.focus);
-    setExercisesInput(workout.exercises.join('\n'));
-    setDifficulty(workout.difficulty);
-    setEstimatedTime(workout.estimatedTime);
-    setMessage('Editing selected workout.');
-  }
+  async function generateProgram() {
+    const prompt = chatPrompt.trim();
 
-  function handleDeleteWorkout(id: string) {
-    setWorkouts((currentWorkouts) =>
-      currentWorkouts.filter((workout) => workout.id !== id)
-    );
-
-    if (editingId === id) {
-      clearForm();
+    if (!prompt) {
+      setMessage('Enter a prompt to generate a workout program.');
+      return;
     }
 
-    setMessage('Workout removed from your weekly split.');
+    setIsGenerating(true);
+    setMessage('');
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'generate-workout-program',
+        {
+          body: {
+            prompt,
+          },
+        }
+      );
+
+      if (error) {
+        throw new Error(error.message || 'Failed to generate program.');
+      }
+
+      if (!data?.program || !Array.isArray(data.program.workouts)) {
+        throw new Error('The AI response was missing workout data.');
+      }
+
+      setGeneratedProgram(data.program as GeneratedProgram);
+      setMessage('Program generated. Review it below and import when ready.');
+    } catch (error) {
+      setGeneratedProgram(null);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to generate a workout program right now.'
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
-  function toggleFavorite(id: string) {
-    setWorkouts((currentWorkouts) =>
-      currentWorkouts.map((workout) =>
-        workout.id === id
-          ? { ...workout, favorite: !workout.favorite }
-          : workout
-      )
+  function importGeneratedProgram() {
+    if (!generatedProgram) {
+      return;
+    }
+
+    const importedWorkouts: WorkoutDay[] = generatedProgram.workouts.map(
+      (workout, index) => ({
+        id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+        day: workout.day,
+        focus: workout.focus,
+        exercises: workout.exercises,
+        difficulty: workout.difficulty,
+        estimatedTime: workout.estimatedTime,
+        favorite: false,
+      })
     );
-  }
 
-  function getDifficultyStyle(level: Difficulty) {
-    if (level === 'Beginner') return styles.beginnerBadge;
-    if (level === 'Intermediate') return styles.intermediateBadge;
-    return styles.advancedBadge;
+    appendWorkouts(importedWorkouts)
+      .then((updatedWorkouts) => {
+        setWorkouts(updatedWorkouts);
+        setGeneratedProgram(null);
+        setChatPrompt('');
+        setMessage(
+          `"${generatedProgram.title}" was imported into My Workouts successfully.`
+        );
+      })
+      .catch(() => {
+        setMessage('Unable to import the generated program right now.');
+      });
   }
 
   return (
@@ -190,8 +245,8 @@ export default function Team10Workouts() {
         <View style={styles.headerCard}>
           <Text style={styles.title}>My Workouts</Text>
           <Text style={styles.subtitle}>
-            Build your weekly split, favorite workouts, and organize routines by
-            difficulty level.
+            Build your weekly split, favorite workouts, and generate a full
+            program with AI.
           </Text>
 
           <View style={styles.statsRow}>
@@ -209,30 +264,125 @@ export default function Team10Workouts() {
           </View>
         </View>
 
+        <View style={styles.chatCard}>
+          <Text style={styles.formTitle}>AI Program Builder</Text>
+          <Text style={styles.chatHint}>
+            Ask for a split like "{CHAT_PLACEHOLDER}" and import the generated
+            workouts directly into your list.
+          </Text>
+
+          <TextInput
+            placeholder={CHAT_PLACEHOLDER}
+            value={chatPrompt}
+            onChangeText={setChatPrompt}
+            multiline
+            numberOfLines={4}
+            style={[styles.input, styles.chatInput]}
+            placeholderTextColor="#8A819A"
+          />
+
+          <Pressable
+            onPress={generateProgram}
+            style={[
+              styles.saveButton,
+              isGenerating && styles.disabledButton,
+            ]}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>Generate Program</Text>
+            )}
+          </Pressable>
+
+          {generatedProgram ? (
+            <View style={styles.generatedCard}>
+              <Text style={styles.generatedTitle}>{generatedProgram.title}</Text>
+              <Text style={styles.generatedSummary}>
+                {generatedProgram.summary}
+              </Text>
+
+              {generatedProgram.workouts.map((workout, index) => (
+                <View key={`${workout.day}-${index}`} style={styles.previewCard}>
+                  <View style={styles.previewHeader}>
+                    <Text style={styles.workoutDay}>{workout.day}</Text>
+                    <Text style={styles.timeText}>{workout.estimatedTime}</Text>
+                  </View>
+
+                  <Text style={styles.workoutFocus}>{workout.focus}</Text>
+                  <View
+                    style={[
+                      styles.badge,
+                      workout.difficulty === 'Beginner'
+                        ? styles.beginnerBadge
+                        : workout.difficulty === 'Intermediate'
+                        ? styles.intermediateBadge
+                        : styles.advancedBadge,
+                    ]}
+                  >
+                    <Text style={styles.badgeText}>{workout.difficulty}</Text>
+                  </View>
+
+                  <View style={styles.exerciseList}>
+                    {workout.exercises.map((exercise, exerciseIndex) => (
+                      <Text
+                        key={`${exercise}-${exerciseIndex}`}
+                        style={styles.exerciseText}
+                      >
+                        • {exercise}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              ))}
+
+              <View style={styles.generatedActions}>
+                <Pressable
+                  onPress={importGeneratedProgram}
+                  style={styles.saveButton}
+                >
+                  <Text style={styles.saveButtonText}>Import Program</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setGeneratedProgram(null)}
+                  style={styles.cancelButton}
+                >
+                  <Text style={styles.cancelButtonText}>Dismiss Preview</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+        </View>
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.filterScroll}
         >
-          {filters.map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              onPress={() => setActiveFilter(filter)}
-              style={[
-                styles.filterButton,
-                activeFilter === filter && styles.activeFilterButton,
-              ]}
-            >
-              <Text
+          {(
+            ['All', 'Favorites', 'Beginner', 'Intermediate', 'Advanced'] as FilterType[]
+          ).map((option) => (
+              <Pressable
+                key={option}
+                onPress={() => setFilter(option)}
                 style={[
-                  styles.filterText,
-                  activeFilter === filter && styles.activeFilterText,
+                  styles.filterButton,
+                  filter === option && styles.activeFilterButton,
                 ]}
               >
-                {filter}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.filterText,
+                    filter === option && styles.activeFilterText,
+                  ]}
+                >
+                  {option}
+                </Text>
+              </Pressable>
+            )
+          )}
         </ScrollView>
 
         {filteredWorkouts.length === 0 ? (
@@ -251,8 +401,16 @@ export default function Team10Workouts() {
                   <Text style={styles.workoutFocus}>{workout.focus}</Text>
                 </View>
 
-                <TouchableOpacity
-                  onPress={() => toggleFavorite(workout.id)}
+                <Pressable
+                  onPress={() =>
+                    setWorkouts((current) =>
+                      current.map((entry) =>
+                        entry.id === workout.id
+                          ? { ...entry, favorite: !entry.favorite }
+                          : entry
+                      )
+                    )
+                  }
                   style={[
                     styles.favoriteButton,
                     workout.favorite && styles.favoriteButtonActive,
@@ -266,11 +424,20 @@ export default function Team10Workouts() {
                   >
                     {workout.favorite ? '♥' : '♡'}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
 
               <View style={styles.metaRow}>
-                <View style={[styles.badge, getDifficultyStyle(workout.difficulty)]}>
+                <View
+                  style={[
+                    styles.badge,
+                    workout.difficulty === 'Beginner'
+                      ? styles.beginnerBadge
+                      : workout.difficulty === 'Intermediate'
+                      ? styles.intermediateBadge
+                      : styles.advancedBadge,
+                  ]}
+                >
                   <Text style={styles.badgeText}>{workout.difficulty}</Text>
                 </View>
 
@@ -281,26 +448,36 @@ export default function Team10Workouts() {
 
               <View style={styles.exerciseList}>
                 {workout.exercises.map((exercise, index) => (
-                  <Text key={index} style={styles.exerciseText}>
+                  <Text key={`${exercise}-${index}`} style={styles.exerciseText}>
                     • {exercise}
                   </Text>
                 ))}
               </View>
 
               <View style={styles.actionRow}>
-                <TouchableOpacity
-                  onPress={() => handleEditWorkout(workout)}
+                <Pressable
+                  onPress={() => editWorkout(workout)}
                   style={styles.editButton}
                 >
                   <Text style={styles.editButtonText}>Edit Workout</Text>
-                </TouchableOpacity>
+                </Pressable>
 
-                <TouchableOpacity
-                  onPress={() => handleDeleteWorkout(workout.id)}
+                <Pressable
+                  onPress={() => {
+                    setWorkouts((current) =>
+                      current.filter((entry) => entry.id !== workout.id)
+                    );
+
+                    if (editingId === workout.id) {
+                      resetForm();
+                    }
+
+                    setMessage('Workout removed from your weekly split.');
+                  }}
                   style={styles.deleteButton}
                 >
                   <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             </View>
           ))
@@ -341,49 +518,51 @@ export default function Team10Workouts() {
           <Text style={styles.label}>Difficulty</Text>
           <View style={styles.difficultyRow}>
             {(['Beginner', 'Intermediate', 'Advanced'] as Difficulty[]).map(
-              (level) => (
-                <TouchableOpacity
-                  key={level}
-                  onPress={() => setDifficulty(level)}
+              (option) => (
+                <Pressable
+                  key={option}
+                  onPress={() => setDifficulty(option)}
                   style={[
                     styles.difficultyButton,
-                    difficulty === level && styles.difficultyButtonActive,
+                    difficulty === option && styles.difficultyButtonActive,
                   ]}
                 >
                   <Text
                     style={[
                       styles.difficultyText,
-                      difficulty === level && styles.difficultyTextActive,
+                      difficulty === option && styles.difficultyTextActive,
                     ]}
                   >
-                    {level}
+                    {option}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               )
             )}
           </View>
 
           <Text style={styles.label}>Exercises</Text>
           <TextInput
-            placeholder={'One exercise per line\nExample:\nDeadlift - 3x5\nLat Pulldown - 3x10'}
-            value={exercisesInput}
-            onChangeText={setExercisesInput}
+            placeholder={
+              'One exercise per line\nExample:\nDeadlift - 3x5\nLat Pulldown - 3x10'
+            }
+            value={exerciseText}
+            onChangeText={setExerciseText}
             multiline
             numberOfLines={5}
             style={[styles.input, styles.exerciseInput]}
             placeholderTextColor="#8A819A"
           />
 
-          <TouchableOpacity onPress={handleSaveWorkout} style={styles.saveButton}>
+          <Pressable onPress={saveWorkout} style={styles.saveButton}>
             <Text style={styles.saveButtonText}>
               {editingId ? 'Save Changes' : 'Add Workout'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
 
           {editingId ? (
-            <TouchableOpacity onPress={clearForm} style={styles.cancelButton}>
+            <Pressable onPress={resetForm} style={styles.cancelButton}>
               <Text style={styles.cancelButtonText}>Cancel Edit</Text>
-            </TouchableOpacity>
+            </Pressable>
           ) : null}
 
           {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -447,6 +626,67 @@ const styles = StyleSheet.create({
     color: '#6D5A80',
     fontSize: 13,
     marginTop: 2,
+  },
+  chatCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#EEE7FA',
+    shadowColor: '#3B1A6E',
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  chatHint: {
+    color: '#6D5A80',
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  chatInput: {
+    minHeight: 110,
+    textAlignVertical: 'top',
+  },
+  generatedCard: {
+    marginTop: 18,
+    backgroundColor: '#FAF8FF',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E9E0FB',
+  },
+  generatedTitle: {
+    color: '#32115F',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  generatedSummary: {
+    color: '#5C4B70',
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 14,
+  },
+  previewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EEE7FA',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 12,
+  },
+  generatedActions: {
+    marginTop: 6,
   },
   filterScroll: {
     marginBottom: 18,
@@ -518,6 +758,7 @@ const styles = StyleSheet.create({
     fontSize: 23,
     fontWeight: '800',
     marginTop: 2,
+    marginBottom: 8,
   },
   favoriteButton: {
     width: 42,
@@ -547,6 +788,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 12,
+    alignSelf: 'flex-start',
   },
   beginnerBadge: {
     backgroundColor: '#E6F7EF',
@@ -693,6 +935,9 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#5D00FF',
     fontWeight: '800',
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   message: {
     color: '#32115F',

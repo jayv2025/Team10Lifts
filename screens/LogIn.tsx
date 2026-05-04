@@ -9,6 +9,12 @@ import {
 import { Button } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
+import {
+  DEMO_ADMIN_EMAIL,
+  DEMO_ADMIN_PASSWORD,
+  isDemoAdminCredentials,
+  setDemoAdminSession,
+} from '../lib/demoAuth';
 
 export default function LogIn({ navigation }: any) {
   const [email, setEmail] = useState('');
@@ -27,6 +33,16 @@ export default function LogIn({ navigation }: any) {
 
     try {
       setLoading(true);
+
+      if (isDemoAdminCredentials(email, password)) {
+        await setDemoAdminSession(true);
+        setMessage('Logged in with the demo admin account.');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+        return;
+      }
 
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -95,6 +111,10 @@ export default function LogIn({ navigation }: any) {
         )}
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
+
+        <Text style={styles.demoHint}>
+          Demo admin: {DEMO_ADMIN_EMAIL} / {DEMO_ADMIN_PASSWORD}
+        </Text>
       </View>
     </LinearGradient>
   );
@@ -145,5 +165,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: 'center',
     fontWeight: '700',
+  },
+
+  demoHint: {
+    color: '#4B4B4B',
+    marginTop: 16,
+    textAlign: 'center',
+    fontSize: 12,
   },
 });

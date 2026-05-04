@@ -1,40 +1,7 @@
 import React from 'react';
 import { Text, ScrollView, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-
-export type Recipe = {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-};
-
-export const recipes: Recipe[] = [
-  {
-    id: '1',
-    name: 'High Protein Breakfast Bowl',
-    category: 'Breakfast',
-    description: 'Eggs, turkey sausage, potatoes, and fruit.',
-  },
-  {
-    id: '2',
-    name: 'Chicken and Rice Recipe Prep',
-    category: 'Lunch',
-    description: 'Grilled chicken, rice, vegetables, and light sauce.',
-  },
-  {
-    id: '3',
-    name: 'Greek Yogurt Protein Snack',
-    category: 'Snack',
-    description: 'Greek yogurt, berries, granola, and honey.',
-  },
-  {
-    id: '4',
-    name: 'Post Workout Smoothie',
-    category: 'Post-Workout',
-    description: 'Protein powder, banana, milk, and peanut butter.',
-  },
-];
+import { recipes } from '../lib/recipeData';
 
 export default function Team10Recipes() {
   return (
@@ -92,9 +59,9 @@ export default function Team10Recipes() {
             Recipe Menu
           </Text>
 
-          {recipes.map((Recipe) => (
+          {recipes.map((recipe) => (
             <View
-              key={Recipe.id}
+              key={recipe.id}
               style={{
                 backgroundColor: '#eeeeee',
                 borderRadius: 10,
@@ -110,7 +77,7 @@ export default function Team10Recipes() {
                   marginBottom: 4,
                 }}
               >
-                {Recipe.name}
+                {recipe.name}
               </Text>
 
               <Text
@@ -121,7 +88,7 @@ export default function Team10Recipes() {
                   marginBottom: 6,
                 }}
               >
-                {Recipe.category}
+                {recipe.category}
               </Text>
 
               <Text
@@ -130,7 +97,7 @@ export default function Team10Recipes() {
                   fontSize: 15,
                 }}
               >
-                {Recipe.description}
+                {recipe.description}
               </Text>
             </View>
           ))}

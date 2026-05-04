@@ -1,5 +1,6 @@
 import * as React from 'react';
 import {
+  ActivityIndicator,
   Text,
   TextInput,
   ScrollView,
@@ -11,66 +12,110 @@ import {
 import { Button, Card, Text as PaperText } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { recipes } from './Team10Recipes';
+import { recipes } from '../lib/recipeData';
+import { supabase } from '../lib/supabase';
+
+const beginnerProgramImage = require('../assets/beginner.jpg');
+const intermediateProgramImage = require('../assets/intermediate.jpg');
+const advancedProgramImage = require('../assets/advanced.jpg');
+const HOME_PROGRAMS = [
+  {
+    title: 'Beginner',
+    subtitle: 'Start your fitness journey with simple workouts.',
+    image: beginnerProgramImage,
+  },
+  {
+    title: 'Intermediate',
+    subtitle: 'Build strength, consistency, and better habits.',
+    image: intermediateProgramImage,
+  },
+  {
+    title: 'Advanced',
+    subtitle: 'Push your limits with harder training plans.',
+    image: advancedProgramImage,
+  },
+] as const;
+
+const HOME_FEATURES = [
+  {
+    title: 'Track Your Workouts',
+    description: 'Log exercises, sets, reps, and progress over time.',
+  },
+  {
+    title: 'Follow Simple Programs',
+    description: 'Choose beginner, intermediate, or advanced plans.',
+  },
+  {
+    title: 'Eat With a Goal',
+    description: 'View meal ideas that support strength and recovery.',
+  },
+] as const;
+
+const HOME_STATS = [
+  {
+    number: '3',
+    label: 'Training Levels',
+  },
+  {
+    number: '4+',
+    label: 'Recipe Ideas',
+  },
+  {
+    number: 'AI',
+    label: 'Fitness Support',
+  },
+] as const;
 
 export default function HomeScreen({ navigation }: any) {
   const [question, setQuestion] = React.useState('');
+  const [answer, setAnswer] = React.useState('');
+  const [aiMessage, setAiMessage] = React.useState('');
+  const [isAsking, setIsAsking] = React.useState(false);
   const { width } = useWindowDimensions();
 
   const isDesktop = width >= 768;
 
-  const programs = [
-    {
-      title: 'Beginner',
-      subtitle: 'Start your fitness journey with simple workouts.',
-      image:
-        'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1470&auto=format&fit=crop',
-    },
-    {
-      title: 'Intermediate',
-      subtitle: 'Build strength, consistency, and better habits.',
-      image:
-        'https://images.unsplash.com/photo-1599058917212-d750089bc07e?q=80&w=1469&auto=format&fit=crop',
-    },
-    {
-      title: 'Advanced',
-      subtitle: 'Push your limits with harder training plans.',
-      image:
-        'https://images.unsplash.com/photo-1534367610401-9f5ed68180aa?q=80&w=1470&auto=format&fit=crop',
-    },
-  ];
-
-  const features = [
-    {
-      title: 'Track Your Workouts',
-      description: 'Log exercises, sets, reps, and progress over time.',
-    },
-    {
-      title: 'Follow Simple Programs',
-      description: 'Choose beginner, intermediate, or advanced plans.',
-    },
-    {
-      title: 'Eat With a Goal',
-      description: 'View meal ideas that support strength and recovery.',
-    },
-  ];
-
-  const stats = [
-    {
-      number: '3',
-      label: 'Training Levels',
-    },
-    {
-      number: '4+',
-      label: 'Recipe Ideas',
-    },
-    {
-      number: 'AI',
-      label: 'Fitness Support',
-    },
-  ];
-
   const recipePreview = recipes.slice(0, 3);
+
+  async function handleAskJake() {
+    const trimmedQuestion = question.trim();
+
+    if (!trimmedQuestion) {
+      setAiMessage('Type a question for Jake first.');
+      setAnswer('');
+      return;
+    }
+
+    try {
+      setIsAsking(true);
+      setAiMessage('');
+
+      const { data, error } = await supabase.functions.invoke('ask-jake', {
+        body: {
+          question: trimmedQuestion,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Unable to reach Jake right now.');
+      }
+
+      if (!data?.answer || typeof data.answer !== 'string') {
+        throw new Error('Jake did not return a valid response.');
+      }
+
+      setAnswer(data.answer);
+    } catch (error) {
+      setAnswer('');
+      setAiMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to reach Jake right now.'
+      );
+    } finally {
+      setIsAsking(false);
+    }
+  }
 
   return (
     <LinearGradient
@@ -125,7 +170,7 @@ export default function HomeScreen({ navigation }: any) {
             { flexDirection: isDesktop ? 'row' : 'column' },
           ]}
         >
-          {stats.map((item, index) => (
+          {HOME_STATS.map((item, index) => (
             <View
               key={index}
               style={[
@@ -160,7 +205,7 @@ export default function HomeScreen({ navigation }: any) {
             { flexDirection: isDesktop ? 'row' : 'column' },
           ]}
         >
-          {features.map((feature, index) => (
+          {HOME_FEATURES.map((feature, index) => (
             <Card
               key={index}
               style={[
@@ -206,7 +251,7 @@ export default function HomeScreen({ navigation }: any) {
             { flexDirection: isDesktop ? 'row' : 'column' },
           ]}
         >
-          {programs.map((program, index) => (
+          {HOME_PROGRAMS.map((program, index) => (
             <Card
               key={index}
               style={[
@@ -215,9 +260,10 @@ export default function HomeScreen({ navigation }: any) {
               ]}
             >
               <ImageBackground
-                source={{ uri: program.image }}
+                source={program.image}
                 style={styles.cardBackground}
                 imageStyle={styles.cardImage}
+                resizeMode="cover"
               >
                 <View style={styles.overlay}>
                   <PaperText variant="titleLarge" style={styles.cardTitle}>
@@ -320,9 +366,27 @@ export default function HomeScreen({ navigation }: any) {
             buttonColor="#5D00FF"
             textColor="white"
             style={styles.askButton}
+            onPress={handleAskJake}
+            disabled={isAsking}
           >
-            Ask Jake
+            {isAsking ? 'Thinking...' : 'Ask Jake'}
           </Button>
+
+          {isAsking ? (
+            <ActivityIndicator
+              color="#5D00FF"
+              style={styles.aiLoadingIndicator}
+            />
+          ) : null}
+
+          {answer ? (
+            <View style={styles.answerCard}>
+              <Text style={styles.answerTitle}>Jake says</Text>
+              <Text style={styles.answerText}>{answer}</Text>
+            </View>
+          ) : null}
+
+          {aiMessage ? <Text style={styles.aiMessage}>{aiMessage}</Text> : null}
         </View>
       </ScrollView>
     </LinearGradient>
@@ -517,6 +581,8 @@ const styles = StyleSheet.create({
 
   cardImage: {
     borderRadius: 20,
+    width: '100%',
+    height: '100%',
   },
 
   overlay: {
@@ -619,5 +685,39 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginTop: 12,
     alignSelf: 'flex-start',
+  },
+
+  aiLoadingIndicator: {
+    marginTop: 14,
+    alignSelf: 'flex-start',
+  },
+
+  answerCard: {
+    marginTop: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D9CCFF',
+    borderRadius: 18,
+    padding: 16,
+  },
+
+  answerTitle: {
+    color: '#5D00FF',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+
+  answerText: {
+    color: '#000000',
+    fontSize: 15,
+    lineHeight: 24,
+  },
+
+  aiMessage: {
+    color: '#5D00FF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 12,
   },
 });

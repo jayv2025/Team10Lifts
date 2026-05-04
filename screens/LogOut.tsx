@@ -3,6 +3,7 @@ import { Text, ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Button } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
+import { getDemoAdminSession, setDemoAdminSession } from '../lib/demoAuth';
 
 export default function LogOut({ navigation }: any) {
   const [loading, setLoading] = useState(false);
@@ -13,6 +14,18 @@ export default function LogOut({ navigation }: any) {
 
     try {
       setLoading(true);
+
+      const isDemoAdmin = await getDemoAdminSession();
+
+      if (isDemoAdmin) {
+        await setDemoAdminSession(false);
+        setMessage('Logged out successfully.');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+        return;
+      }
 
       const { error } = await supabase.auth.signOut();
 
